@@ -453,6 +453,10 @@ function HomeContent() {
   const [signInPromptVisible, setSignInPromptVisible] = useState(false);
   const [adToast, setAdToast] = useState<string | null>(null);
 
+  // Welcome CTA (shown after intro for non-logged-in users)
+  const [welcomeCtaVisible, setWelcomeCtaVisible] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // A8: Ghost preview for own building
   const ghostPreviewShownRef = useRef(false);
   const [ghostPreviewLogin, setGhostPreviewLogin] = useState<string | null>(null);
@@ -1156,7 +1160,12 @@ function HomeContent() {
     setIntroPhase(-1);
     setIntroConfetti(false);
     localStorage.setItem("gitcity_intro_seen", "true");
-  }, []);
+    // Show welcome CTA for non-logged-in users who haven't seen it
+    if (!session && !localStorage.getItem("gitcity_welcome_seen")) {
+      setWelcomeCtaVisible(true);
+      setTimeout(() => setWelcomeCtaVisible(false), 12000);
+    }
+  }, [session]);
 
   const replayIntro = useCallback(() => {
     setIntroMode(true);
@@ -1613,10 +1622,10 @@ function HomeContent() {
         rabbitCinematicTarget={rabbitSighting ?? undefined}
         onBuildingClick={(b) => {
           trackBuildingClicked(b.login);
-          // A1: Sign-in prompt after 3 building clicks without session
+          // A1: Sign-in prompt after 1 building click without session
           if (!session && !signInPromptShownRef.current) {
             buildingClickCountRef.current += 1;
-            if (buildingClickCountRef.current >= 3) {
+            if (buildingClickCountRef.current >= 1) {
               signInPromptShownRef.current = true;
               setSignInPromptVisible(true);
               trackSignInPromptShown();
@@ -2087,36 +2096,73 @@ function HomeContent() {
               );
             })()}
 
-            {/* Search */}
-            <form
-              onSubmit={handleSubmit}
-              className="flex w-full max-w-md items-center gap-2"
-            >
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  if (feedback?.type === "error") setFeedback(null);
-                }}
-                placeholder="add a dev to the city"
-                className="min-w-0 flex-1 border-[3px] border-border bg-bg-raised px-3 py-2 text-base sm:text-xs text-cream outline-none transition-colors placeholder:text-dim sm:px-4 sm:py-2.5"
-                style={{ borderColor: undefined }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = theme.accent)}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "")}
-              />
-              <button
-                type="submit"
-                disabled={loading || !username.trim()}
-                className="btn-press flex-shrink-0 px-4 py-2 text-xs text-bg disabled:opacity-40 sm:px-5 sm:py-2.5"
-                style={{
-                  backgroundColor: theme.accent,
-                  boxShadow: `4px 4px 0 0 ${theme.shadow}`,
-                }}
+
+            {/* Search / Welcome CTA takeover */}
+            {welcomeCtaVisible && !session ? (
+              <div
+                className="flex w-full max-w-md flex-col items-center gap-2 border-[3px] bg-bg-raised/90 px-5 py-4 backdrop-blur-sm animate-[slide-up_0.3s_ease-out]"
+                style={{ borderColor: theme.accent }}
               >
-                {loading ? <span className="blink-dot inline-block">_</span> : "Search"}
-              </button>
-            </form>
+                <p className="text-[11px] text-cream normal-case leading-relaxed">
+                  Find your building in the city
+                </p>
+                <button
+                  onClick={() => {
+                    setWelcomeCtaVisible(false);
+                    localStorage.setItem("gitcity_welcome_seen", "true");
+                    handleSignIn();
+                  }}
+                  className="btn-press w-full max-w-[240px] py-2.5 text-[10px] text-bg"
+                  style={{
+                    backgroundColor: theme.accent,
+                    boxShadow: `3px 3px 0 0 ${theme.shadow}`,
+                  }}
+                >
+                  Sign in with GitHub
+                </button>
+                <button
+                  onClick={() => {
+                    setWelcomeCtaVisible(false);
+                    localStorage.setItem("gitcity_welcome_seen", "true");
+                    setTimeout(() => searchInputRef.current?.focus(), 100);
+                  }}
+                  className="text-[9px] text-dim transition-colors hover:text-muted normal-case"
+                >
+                  or type your username
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={handleSubmit}
+                className="flex w-full max-w-md items-center gap-2"
+              >
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (feedback?.type === "error") setFeedback(null);
+                  }}
+                  placeholder={session ? "search any GitHub username" : "type your GitHub username"}
+                  className="min-w-0 flex-1 border-[3px] border-border bg-bg-raised px-3 py-2 text-base sm:text-xs text-cream outline-none transition-colors placeholder:text-dim sm:px-4 sm:py-2.5"
+                  style={{ borderColor: undefined }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = theme.accent)}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = "")}
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !username.trim()}
+                  className="btn-press flex-shrink-0 px-4 py-2 text-xs text-bg disabled:opacity-40 sm:px-5 sm:py-2.5"
+                  style={{
+                    backgroundColor: theme.accent,
+                    boxShadow: `4px 4px 0 0 ${theme.shadow}`,
+                  }}
+                >
+                  {loading ? <span className="blink-dot inline-block">_</span> : "Search"}
+                </button>
+              </form>
+            )}
 
             {/* Search Feedback: loading phases + errors */}
             <SearchFeedback feedback={feedback} accentColor={theme.accent} onDismiss={() => setFeedback(null)} onRetry={searchUser} />
